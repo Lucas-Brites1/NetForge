@@ -32,6 +32,9 @@ struct Buffer
     char* write_ptr();
     void advance_write_ptr(std::size_t bytes_written);
     void advance_read_ptr(std::size_t bytes_read);
+    std::string get_from_to(std::size_t start, std::size_t end);
+    std::size_t find(char character_to_find, std::size_t start_position_to_find); // Find first occurance of a character.
+    std::size_t find(const std::string& pattern, std::size_t start_position_to_find);
     void clear();
 };
 

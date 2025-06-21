@@ -3,7 +3,6 @@
 #include <exception>
 #include <iostream>
 #include "Socket.hpp"
-#include "Utils.hpp"
 
 ssize_t Client::readFromSocket()
 {

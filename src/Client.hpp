@@ -2,9 +2,9 @@
 #define CLIENT_H
 
 #include <sys/types.h>
+#include "Types.hpp"
 #include "Buffer.hpp"
 #include "Socket.hpp"
-#include "Utils.hpp"
 
 class Client
 {

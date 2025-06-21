@@ -1,14 +1,15 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
+#include "Types.hpp"
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <cstring>
+#include <filesystem>
 #include <stdexcept>
 #include "Buffer.hpp"
-#include "Utils.hpp"
 
 constexpr int BACKLOG_SIZE = 128;
 
@@ -40,6 +41,25 @@ class Socket
       }
       std::memset(&socketcfg, 0, sizeof(socketcfg));
     }
+
+    Socket(Socket&& other) noexcept : socket_fd(other.socket_fd), addr_family(other.addr_family), socket_type(other.socket_type) { other.socket_fd = -1; }
+    Socket& operator=(Socket&& other) noexcept 
+    {
+      if (this != &other)
+      {
+        if (socket_fd != -1) { close(socket_fd); }
+        socket_fd = other.socket_fd;
+        addr_family = other.addr_family;
+        socket_type = other.socket_type;
+
+        other.socket_type = -1;
+      }
+
+      return *this;
+    }
+
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
 
     ~Socket()
     {

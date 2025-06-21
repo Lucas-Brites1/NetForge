@@ -1,12 +1,14 @@
+#include "Utils.hpp"
 #include "Socket.hpp"
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 #include <arpa/inet.h>
 #include <sys/types.h>
-#include "Utils.hpp"
 
 void Socket::bindSocket(const std::string& ip_address, u16 port)
 {
@@ -143,13 +145,32 @@ ssize_t Socket::sendData(Buffer& outputBuffer)
 
   if (outputBuffer.size() == 0) return 0;
 
-  ssize_t bytes_sent = send(socket_fd, outputBuffer.data(), outputBuffer.size(), 0);
-  if (bytes_sent == -1)
+  ssize_t total_bytes_sent = 0;
+  size_t bytes_to_send = outputBuffer.size();
+  const char* current_send_ptr = outputBuffer.data();
+
+  while (bytes_to_send > 0)
   {
-    std::perror("Socket sendData error");
-    throw std::runtime_error("Failed to send data from socket.");
+    ssize_t bytes_sent_this_call = send(socket_fd, current_send_ptr, bytes_to_send, 0);
+    if (bytes_sent_this_call == -1)
+    {
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+      {
+        throw std::runtime_error("Failed to send data from socket (temporary error).");
+      }
+      else
+      {
+        std::perror("Socket sendData error");
+        throw std::runtime_error("Failed to send data from socket.");
+      }
+    }
+    else if (bytes_sent_this_call == 0) break;
+
+    total_bytes_sent += bytes_sent_this_call;
+    current_send_ptr += bytes_sent_this_call;
+    bytes_to_send -= bytes_sent_this_call;
   }
 
-  outputBuffer.advance_read_ptr(bytes_sent);
-  return bytes_sent;
+  outputBuffer.advance_read_ptr(total_bytes_sent);
+  return total_bytes_sent;
 }
