@@ -35,6 +35,7 @@ const std::string getMethodStr(HTTPMethod method)
     case PUT: { return "PUT"; }
     case DELETE: { return "DELETE"; }
     case HEAD: { return "HEAD"; }
+    case UNKNOWN: { return "UNKNOWN"; }
     default: { return "UNKNOWN"; }
   }
 }
@@ -137,4 +138,39 @@ void parseHttpRequest(Buffer& buffer, HttpRequest& request)
     buffer.advance_read_ptr(current_pos);
 }
 
+inline int hex_char_to_int(char c) {
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    } else if (c >= 'a' && c <= 'f') {
+        return 10 + (c - 'a');
+    } else if (c >= 'A' && c <= 'F') {
+        return 10 + (c - 'A');
+    }
+    throw std::runtime_error("Invalid hex character in URL encoding.");
+}
 
+std::string url_decode(const std::string& encoded_str) {
+    std::string decoded_str;
+    decoded_str.reserve(encoded_str.length()); 
+
+    for (std::size_t i = 0; i < encoded_str.length(); ++i) {
+        char c = encoded_str[i];
+
+        if (c == '%') {
+            if (i + 2 >= encoded_str.length() || !isxdigit(encoded_str[i+1]) || !isxdigit(encoded_str[i+2])) {
+                throw std::runtime_error("Malformed URL encoding: invalid percent sequence.");
+            }
+            int high_nibble = hex_char_to_int(encoded_str[i+1]);
+            int low_nibble = hex_char_to_int(encoded_str[i+2]);
+            decoded_str += static_cast<char>((high_nibble << 4) | low_nibble);
+
+            i += 2; 
+        } else if (c == '+') {
+            decoded_str += ' ';
+        } else {
+            decoded_str += c;
+        }
+    }
+
+    return decoded_str;
+}

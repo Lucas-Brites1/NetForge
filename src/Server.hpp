@@ -5,6 +5,7 @@
 #include <vector>
 #include "Client.hpp"
 #include "HttpRequest.hpp"
+#include "Middlewares.hpp"
 #include "Routes.hpp"
 #include "Socket.hpp"
 #include "Types.hpp"
@@ -23,9 +24,10 @@ class Server
     Socket                  serverSocket;
     std::vector<Client>     clientsConnections;
     Routes                  serverRoutes;
-    //std::vector<Middleware> middleware;
+    Middlewares             serverMiddlewares;
 
-    void handleClientsConn(); 
+    void process(Client& client);
+    void h_NotFound(const HttpRequest& req, HttpResponse& res);
 
   public:
     Server(const std::string& ip_address, u16 port, int sock_family = DEFAULT_SOCK_FAMILY, int sock_type = DEFAULT_SOCK_TYPE);
@@ -33,6 +35,7 @@ class Server
     
     void start();
     void add(AddType type, HTTPMethod method, const std::string& url, HttpHandler handler_func);
+    void use(HttpHandler h_func); // use() to register global middlewares;
 };
 
 

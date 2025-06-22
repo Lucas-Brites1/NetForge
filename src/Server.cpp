@@ -2,10 +2,12 @@
 #include <sys/socket.h>
 #include <exception>
 #include <iostream>
+#include <ostream>
 #include <stdexcept>
 #include <vector>
 #include "Client.hpp"
 #include "HttpRequest.hpp"
+#include "Routes.hpp"
 #include "Socket.hpp"
 #include "Utils.hpp"
 
@@ -20,44 +22,49 @@ Server::Server(const std::string& ip_address, u16 port, int sock_family, int soc
   } 
 }
 
+void Server::process(Client& client)
+{
+  HttpRequest req;
+  HttpResponse res;
+  
+  ssize_t bytes_read = client.readFromSocket();
+  if (bytes_read <= 0) return;
+  
+  try 
+  {
+    parseHttpRequest(client.inputBuffer, req);
+
+    serverMiddlewares.execute(req.getUri().getRawUri(), req.getMethod(), req, res);
+    bool route_found = serverRoutes.dispatch(req.getMethod(), req.getUri().getPath(), req, res);
+    
+    if (!route_found)
+    {
+      Server::h_NotFound(req, res);
+    }
+
+    const std::string final_response_str = res.toString();
+    client.outputBuffer.append(final_response_str.data(), final_response_str.length());
+    
+    ssize_t bytes_sent = client.writeFromSocket();
+    std::cout << "Sent " << bytes_sent << " bytes." << '\n';
+
+    client.inputBuffer.clear();
+    client.outputBuffer.clear();
+  } catch (const std::exception E)
+  {
+    std::cerr << "Error processing client request." << E.what() << std::endl;
+    // 500 (Internal Server Error)
+  }   
+}
+
 void Server::start()
 {
   while(true)
   {
     Socket newClientSocket = serverSocket.acceptConnection();
     clientsConnections.emplace_back(std::move(newClientSocket));
-    Client& current_client = clientsConnections.back();
-    HttpRequest http_req;
-    HttpResponse http_res;
-
-    current_client.readFromSocket();
-    // readFromSocket -> parsing to HTTPREQUEST -> fill HTTPRESPONSE -> writeFromSocket
-    parseHttpRequest(current_client.inputBuffer, http_req);
-    std::cout << "Method: " << getMethodStr(http_req.getMethod()) << ", Endpoint: " << http_req.getUri().getRawUri() << ", Version: " << http_req.getVersion() << '\n';
-    std::cout << "REQUEST HEADERS:\n";
-    for (const auto& header : http_req.getHeaders()) 
-    {
-      std::cout << "  " << header.first << ": " << header.second << '\n';
-    }
-    std::cout << "--- END HEADERS ---\n";
-    this->serverRoutes.dispatch(http_req.getMethod(), http_req.getUri().getRawUri(), http_req, http_res);
-
-    /*const std::string http_response =
-                            "HTTP/1.1 200 OK\r\n" // Status line
-                            "Content-Type: text/html\r\n" // Type of content
-                            "Content-Length: 12\r\n" // Length of "Hello World"
-                            "\r\n" // Empty line to signal end of headers
-                            "Hello World\n"; // Body of the response
-                                                    */
-
-    std::string final_http_response_str = http_res.toString();
-    current_client.outputBuffer.append(final_http_response_str.data(), final_http_response_str.length());
-    ssize_t bytes_sent = current_client.writeFromSocket();
-
-    std::cout << "Sent " << bytes_sent << " bytes to client" << '\n';
-    std::cout << current_client.outputBuffer.data() << '\n';
-
-    std::cout << "Request: " << current_client.inputBuffer.data() << '\n';
+    Client& client_in_vector = clientsConnections.back();
+    Server::process(client_in_vector);
   }
 }
 
@@ -68,11 +75,11 @@ void Server::add(AddType type, HTTPMethod method, const std::string& url, HttpHa
     case ROUTE:
     {
       this->serverRoutes.add(method, url, handler_func);
-      std::cout << "Rota '" << "GET" << " " << url << "' adicionada." << std::endl;
       break;
     }
     case MIDDLEWARE:
     {
+      this->serverMiddlewares.add(method, url, handler_func);
       break;
     }
     default:
@@ -82,3 +89,15 @@ void Server::add(AddType type, HTTPMethod method, const std::string& url, HttpHa
   }
 }
 
+void Server::use(HttpHandler h_func)
+{
+  this->serverMiddlewares.use(h_func);
+}
+
+void Server::h_NotFound(const HttpRequest& req, HttpResponse& res)
+{
+  const std::string body_content = "<h1>404 Not Found</h1><p>The requested resource was not found on this server.</p>";
+
+  res.setBody(body_content);
+  res.setStatusCode(HttpStatus::NotFound);
+}

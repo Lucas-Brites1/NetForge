@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <cstring>
-#include <filesystem>
 #include <stdexcept>
 #include "Buffer.hpp"
 
@@ -48,13 +47,13 @@ class Socket
       if (this != &other)
       {
         if (socket_fd != -1) { close(socket_fd); }
+
         socket_fd = other.socket_fd;
         addr_family = other.addr_family;
         socket_type = other.socket_type;
 
-        other.socket_type = -1;
+        other.socket_fd = -1;
       }
-
       return *this;
     }
 
