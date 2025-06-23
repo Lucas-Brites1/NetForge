@@ -150,27 +150,99 @@ inline int hex_char_to_int(char c) {
 }
 
 std::string url_decode(const std::string& encoded_str) {
-    std::string decoded_str;
-    decoded_str.reserve(encoded_str.length()); 
+  std::string decoded_str;
+  decoded_str.reserve(encoded_str.length()); 
 
-    for (std::size_t i = 0; i < encoded_str.length(); ++i) {
-        char c = encoded_str[i];
+  for (std::size_t i = 0; i < encoded_str.length(); ++i)
+  {
+    char c = encoded_str[i];
 
-        if (c == '%') {
-            if (i + 2 >= encoded_str.length() || !isxdigit(encoded_str[i+1]) || !isxdigit(encoded_str[i+2])) {
-                throw std::runtime_error("Malformed URL encoding: invalid percent sequence.");
-            }
-            int high_nibble = hex_char_to_int(encoded_str[i+1]);
-            int low_nibble = hex_char_to_int(encoded_str[i+2]);
-            decoded_str += static_cast<char>((high_nibble << 4) | low_nibble);
+    if (c == '%') {
+      if (i + 2 >= encoded_str.length() || !isxdigit(encoded_str[i+1]) || !isxdigit(encoded_str[i+2])) {
+        throw std::runtime_error("Malformed URL encoding: invalid percent sequence.");
+      }
 
-            i += 2; 
-        } else if (c == '+') {
-            decoded_str += ' ';
-        } else {
-            decoded_str += c;
-        }
+      int high_nibble = hex_char_to_int(encoded_str[i+1]);
+      int low_nibble = hex_char_to_int(encoded_str[i+2]);
+      decoded_str += static_cast<char>((high_nibble << 4) | low_nibble);
+
+      i += 2; 
+      } else if (c == '+') {
+        decoded_str += ' ';
+      } else {
+        decoded_str += c;
+      }
     }
 
     return decoded_str;
+}
+
+std::string url_encode(const std::string& str) {
+    std::string encoded_str;
+    encoded_str.reserve(str.length() * 2);
+
+    for (char c : str) {
+        if (
+            (c >= '0' && c <= '9') ||
+            (c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            c == '-' || c == '_' || c == '.' || c == '~'
+        ) {
+            encoded_str += c;
+        } else if (c == ' ') {
+            encoded_str += '+'; 
+        } else {
+            encoded_str += '%';
+            encoded_str += "0123456789ABCDEF"[static_cast<unsigned char>(c) >> 4];
+            encoded_str += "0123456789ABCDEF"[static_cast<unsigned char>(c) & 0xF];
+        }
+    }
+    return encoded_str;
+}
+
+std::string url_encode(const Uri& uri)
+{
+  std::string encoded_str;
+  encoded_str += uri.getPath();
+
+  const auto& query_params = uri.getQueryParams();
+  if (!query_params.empty())
+  {
+    encoded_str += '?';
+    bool first_param = true;
+    for (const auto& pair : query_params)
+    {
+      if (!first_param) encoded_str += '&';
+      encoded_str += url_encode(pair.first) + '=' + url_encode(pair.second); 
+      
+      first_param = false;
+    }
+  }
+
+  return encoded_str;
+}
+
+std::string escape_string(std::string original_str)
+{
+  std::string final_str;
+  final_str.reserve(original_str.length() + 2);
+  final_str += '"';
+
+  for (char c : original_str)
+  {
+    switch (c) 
+    {
+      case '"':  { final_str += "\\\"";  break;}
+      case '\\': { final_str += "\\\\";  break;}
+      case '\f': { final_str += "\\f";   break;}
+      case '\n': { final_str += "\\n";   break;}
+      case '\b': { final_str += "\\b";   break;}
+      case '\r': { final_str += "\\r";   break;}
+      case '\t': { final_str += "\\t";   break;}
+      default:   { final_str += c;       break;}
+    }
+  }
+
+  final_str += '"';
+  return final_str;
 }
